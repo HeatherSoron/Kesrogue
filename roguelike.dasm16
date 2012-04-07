@@ -62,11 +62,23 @@
 :print_text_loop
 	IFE [A], 0x0000
 		SET PC, POP
+	IFE [A], 0x000A
+		SET PC, print_text_newline
 	SET [B], [A]
 	BOR [B], 0xF000
 	ADD A, 1
 	ADD B, 1
 	SET PC, print_text_loop
+
+:print_text_newline
+	SUB B, 0x8000
+	DIV B, [screen_width]
+	ADD B, 1
+	MUL B, [screen_width]
+	ADD B, 0x8000
+	ADD A, 1
+	SET PC, print_text_loop
+
 
 
 ; leaves registers how it found them
