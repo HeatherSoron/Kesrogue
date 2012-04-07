@@ -15,8 +15,21 @@
 	IFN A, 0
 		JSR init_prng
 	
+	JSR clear_screen
 	SET A, text_welcome
+	SET B, 0
 	JSR print_text
+	
+	SET A, [screen_width]
+	MUL A, 7
+	SUB A, 16
+	JSR get_string
+	
+	SET B, player_name
+	SET C, 0x0010
+	JSR copy_string_backward
+	
+	JSR write_name
 	
 	SUB PC, 1
 	
@@ -28,7 +41,9 @@
 	SET PC, POP
 
 :init_prng
+	JSR clear_screen
 	SET A, text_seed_entropy
+	SET B, 0
 	JSR print_text
 :prng_seed_loop
 	SET A, [0x9000]
@@ -50,15 +65,20 @@
 ; end DEBUG code
 	
 	SET PC, prng_seed_loop
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SECTION: TEXT FUNCTIONS ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 	
 ; input:
 ; A: pointer to c-string to be printed
+; B: offset to print at
 
 ; clobbers B and increments A all the way to the end of the c-string
 
 :print_text
-	JSR clear_screen
-	SET B, 0x8000
+	ADD B, 0x8000
 :print_text_loop
 	IFE [A], 0x0000
 		SET PC, POP
@@ -80,6 +100,80 @@
 	SET PC, print_text_loop
 
 
+; inputs:
+; A: position to place the cursor (offset)
+
+; outputs:
+; A: a pointer to where the string resides (on the stack! be careful to copy it ASAP)
+
+; clobbers B and C
+
+:get_string
+	SET B, SP
+	ADD A, 0x8000
+	SET [A], [cursor_char]
+	SET [0x9000], 0
+:get_string_loop
+	SET C, [0x9000]
+	IFE C, 0
+		SET PC, get_string_loop
+	IFE C, [key_newline]
+		SET PC, exit_get_string
+	SET [0x9000], 0
+	SET PUSH, C
+	SET [A], PEEK
+	BOR [A], 0xF000
+	ADD A, 1
+	SET [A], [cursor_char]
+	SET PC, get_string_loop
+
+:exit_get_string
+	SET PUSH, 0x0000
+	SET SP, B
+	SET A, B
+	SUB A, 1
+	SET PC, POP
+
+
+; no inputs
+; clobbers A and B
+; writes name to lower-left corner (16 chars only)
+
+:write_name
+	SET A, player_name
+	SET B, [screen_height]
+	SUB B, 1
+	MUL B, [screen_width]
+	JSR print_text
+	SET PC, POP
+
+
+; inputs:
+; A: source string pointer (backwards, e.g. on the stack)
+; B: destination string pointer
+; C: maximum length of B (not including the null terminator)
+
+; clobbers A, B and C, but ensures that the dest string is null-terminated
+
+:copy_string_backward
+	IFE C, 0
+		SET PC, exit_copy_string
+	IFE [A], 0
+		SET PC, exit_copy_string
+	SUB C, 1
+	SET [B], [A]
+	ADD B, 1
+	SUB A, 1
+	SET PC, copy_string_backward
+
+:exit_copy_string
+	ADD B, 1
+	SET [B], 0
+	SET PC, POP
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SECTION: UTILITY FUNCTIONS ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; leaves registers how it found them
 ; no inputs taken
@@ -187,6 +281,9 @@
 :key_newline
 	DAT 0x000A ; ASCII line feed (Unix-style \n)
 
+:cursor_char
+	DAT 0x0700
+
 ;;;;;;;;;;;;;;;;;;;;
 ; SECTION: CONTENT ;
 ;;;;;;;;;;;;;;;;;;;;
@@ -199,6 +296,8 @@
 
 :text_welcome
 	DAT "Welcome to Soron's roguelike for the DCPU!"
+	DAT 0x000A
+	DAT "Enter your name:"
 	DAT 0x0000
 
 :text_seed_entropy
@@ -206,12 +305,36 @@
 	DAT 0x000A
 	DAT 0x000A
 	DAT "Press enter when you're done"
+	DAT 0x0000
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; SECTION: VARIABLE DATA ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 :prng_state
+	DAT 0x0000
+
+:player_name ; up to 16 chars allowed (plus a terminal 0x0000)
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
 	DAT 0x0000
 
 ; dungeon tile stored as 2 words
@@ -223,3 +346,8 @@
 
 ; items are stored in 1 (?) byte, with the content ID on the low byte
 ; the high byte is used to indicate the enchantment (may need more space...?)
+
+	DAT 0xDEAD
+	DAT 0xBEEF
+	DAT 0xDEAD
+	DAT 0xBEEF
