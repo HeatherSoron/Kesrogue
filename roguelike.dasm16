@@ -57,9 +57,9 @@
 	
 ; DEBUG code
 	SET A, prng_state
-	SET B, [screen_width]
-	MUL B, [screen_height]
-	SUB B, [screen_width]
+	SET B, [screen_height]
+	SUB B, 1
+	MUL B, [screen_width]
 	SET C, 1
 	JSR print_mem_dump
 ; end DEBUG code
