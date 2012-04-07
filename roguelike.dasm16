@@ -1,0 +1,213 @@
+; key codes that might vary:
+; left: 0x0001
+; right: 0x0002
+; up: 0x0003
+; down: 0x0004
+; enter: 0x000A (line feed, unix-style newline)
+; backspace: 0x0008 (ASCII backspace)
+; escape: 0x001B (ASCII escape)
+
+; all printing characters (even shifted) are assumed to be mapped to their ASCII value
+
+:init
+	
+	JSR is_prng_null
+	IFN A, 0
+		JSR init_prng
+	
+	SET A, text_welcome
+	JSR print_text
+	
+	SUB PC, 1
+	
+; returns 1 if prng state is zero
+; returns 0 otherwise
+:is_prng_null
+	IFE [prng_state], 0
+		SET A, 1
+	SET PC, POP
+
+:init_prng
+	SET A, text_seed_entropy
+	JSR print_text
+:prng_seed_loop
+	SET A, [0x9000]
+	IFE A, 0
+		SET PC, prng_seed_loop
+	IFE A, [key_newline]
+		SET PC, POP
+	ADD [prng_state], 1 ; so that we don't get stuck on 0
+	MUL [prng_state], A
+	SET [0x9000], 0
+	
+; DEBUG code
+	SET A, prng_state
+	SET B, [screen_width]
+	MUL B, [screen_height]
+	SUB B, [screen_width]
+	SET C, 1
+	JSR print_mem_dump
+; end DEBUG code
+	
+	SET PC, prng_seed_loop
+	
+; input:
+; A: pointer to c-string to be printed
+
+; clobbers B and increments A all the way to the end of the c-string
+
+:print_text
+	JSR clear_screen
+	SET B, 0x8000
+:print_text_loop
+	IFE [A], 0x0000
+		SET PC, POP
+	SET [B], [A]
+	BOR [B], 0xF000
+	ADD A, 1
+	ADD B, 1
+	SET PC, print_text_loop
+
+
+; leaves registers how it found them
+; no inputs taken
+
+:clear_screen
+	SET PUSH, A
+	SET PUSH, B
+	SET A, SP
+	SET SP, 0x8000
+	SET B, [screen_width]
+	MUL B, [screen_height]
+	ADD B, 0x8000
+:clear_screen_loop
+	SET POP, 0
+	IFG SP, B
+		SET PC, exit_clear_screen
+	SET PC, clear_screen_loop
+:exit_clear_screen
+	SET SP, A
+	SET B, POP
+	SET A, POP
+	SET PC, POP
+	
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SECTION: DEBUG FUNCTIONS ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; inputs:
+; A: position to start dumping from
+; B: offset on screen to start writing to
+; C: length to dump
+
+; do note that B+C should not be greater than width*height, or memory may be corrupted
+
+; B is progressively incremented here
+; I is used as an iterator
+
+:print_mem_dump
+	SET PUSH, I
+	SET PUSH, X
+	SET I, 0
+	SET X, A
+	ADD B, 0x8000
+:mem_dump_loop
+	SET A, [X]
+	AND A, 0xf000
+	SHR A, 12
+	JSR write_hex
+	
+	SET A, [X]
+	AND A, 0x0f00
+	SHR A, 8
+	JSR write_hex
+	
+	SET A, [X]
+	AND A, 0x00f0
+	SHR A, 4
+	JSR write_hex
+	
+	SET A, [X]
+	AND A, 0x000f
+	JSR write_hex
+	
+	SET [B], 0xF020 ; write a space to screen
+	ADD B, 1
+	
+	ADD X, 1
+	ADD I, 1
+	
+	IFG C, I
+		SET PC, mem_dump_loop
+		
+:exit_mem_dump
+	SET X, POP
+	SET I, POP
+	SET PC, POP
+
+
+; writes the lowest nybble of A to screen position B
+; clobbers A and increments B by 1
+
+:write_hex
+	AND A, 0x000F
+	ADD A, 0xF030 ; we want (A | 0xF000) + 30, but A is 4 bits, so A + 0x7030 is safe
+	IFG A, 0xF039 ; check if A is A-F, which are offset a little higher (*sigh*)
+		ADD A, 7
+	SET [B], A
+	ADD B, 1
+	SET PC, POP
+
+;;;;;;;;;;;;;;;;;;;;;;
+; SECTION: CONSTANTS ;
+;;;;;;;;;;;;;;;;;;;;;;
+
+:dungeon_width
+	DAT 0x0100
+:dungeon_height
+	DAT 0x0080
+:screen_width
+	DAT 32
+:screen_height
+	DAT 16
+
+:key_newline
+	DAT 0x000A ; ASCII line feed (Unix-style \n)
+
+;;;;;;;;;;;;;;;;;;;;
+; SECTION: CONTENT ;
+;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;
+; SECTION: TEXT ;
+;;;;;;;;;;;;;;;;;
+
+; this uses c-strings
+
+:text_welcome
+	DAT "Welcome to Soron's roguelike for the DCPU!"
+	DAT 0x0000
+
+:text_seed_entropy
+	DAT "Type a bit to seed the entropy"
+	DAT 0x000A
+	DAT 0x000A
+	DAT "Press enter when you're done"
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SECTION: VARIABLE DATA ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+:prng_state
+	DAT 0x0000
+
+; dungeon tile stored as 2 words
+; tile type stored on the lowest nybble of the first word
+; the next nybble is reserved for temporary tile data
+; highest byte stores a mob ID (player at 0, and up to 255 mobs allowed)
+; item stored on second word
+
+
+; items are stored in 1 (?) byte, with the content ID on the low byte
+; the high byte is used to indicate the enchantment (may need more space...?)
