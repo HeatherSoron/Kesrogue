@@ -1,0 +1,32 @@
+Not 100% complete.
+
+/==================\
+| HARD LIMITATIONS |
+\==================/
+
+Map dimensions: 128x64
+
+Max number of mobs per level: 254 monsters, 1 player
+
+Max number of tile types: 16 (including null)
+
+Max tile states: 16
+
+Longest player name: 16 chars (not counting the terminal null word)
+
+Max number of mobs per tile: 1
+Max number of items per tile: 1
+
+/============\
+| LEVEL DATA |
+\============/
+
+This is the biggie. It currently takes up 16k of RAM. Tiles are stored in 2 words. The low word is for mob and tile type information, the high word is for what item is on the tile.
+
+The tile word is divided into 3 sections. The lowest nybble is used for tile type. The next nybble is reserved for tile state, such as seen/not seen (which may be a bitmask, later on). The high byte stores the ID of the mob on the tile.
+
+/===================\
+| DATA ORGANIZATION |
+\===================/
+
+Most of the data occurs after the code (though not necessarily all; I think some small things like PRNG state might be intermixed with the code). Read-only content (mob definitions, etc.) occurs before variable content. We should probably offload some of that to floppy, when available. The massive tile data block (16k!) is at the end of the data block, and is followed by 0xDEADBEEFDEADBEEF.
