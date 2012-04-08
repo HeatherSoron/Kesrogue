@@ -1559,7 +1559,10 @@
 ; this uses c-strings
 
 :text_welcome
-	DAT "Welcome to Soron's roguelike for the DCPU!"
+	DAT "       Welcome to Kesrogue,"
+	DAT 0x000A
+	DAT "    the first DCPU roguelike!"
+	DAT 0x000A
 	DAT 0x000A
 	DAT "Enter your name:"
 	DAT 0x0000
