@@ -172,11 +172,16 @@
 	
 	SET A, B
 	
-	IFE C, PEEK
-		SET PC, build_horiz_wall_row
 	IFG C, PEEK
-		SET PC, exit_furnish_room
+		SET PC, build_bottom_wall
 	SET PC, build_next_room_row
+
+:build_bottom_wall
+	SET [A], [wall_tile]
+	ADD A, 2
+	IFG A, C
+		SET PC, exit_furnish_room
+	SET PC, build_bottom_wall
 	
 :build_horiz_wall_row
 	SET [A], [wall_tile]
