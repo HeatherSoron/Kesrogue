@@ -42,6 +42,9 @@
 ; SECTION: MAP FUNCTIONS ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; assume this clobbers everything for now
+; (we can make it safe later if needed)
+
 :gen_level
 	JSR clear_level
 	
@@ -58,9 +61,190 @@
 	ADD A, 1
 	SET [player_y], A
 	
+	; A is still player_y, so we can place the player in level data real quick
+	
+	; first, get the row of level data we need
+	MUL A, [dungeon_width]
+	MUL A, 2
+	; now the column
+	ADD A, [player_x]
+	ADD A, [player_x]
+	; now convert that to an address
+	ADD A, level_data
+	; and put the player there!
+	BOR [A], [player_offset]
+	
+	JSR rand
+	SET B, [screen_width]
+	SUB B, 4 ; 2 reserved columns, and 2 walls
+	MOD A, B
+	IFG 4, A
+		SET A, 4
+	SET X, A
+	JSR rand
+	SET B, [screen_height]
+	SUB B, 4 ; 2 reserved rows, and 2 walls
+	MOD A, B
+	IFG 4, A
+		SET A, 4
+	SET Y, A
+	
+	
+	JSR rand
+	MOD A, Y
+	SET B, A
+	JSR rand
+	MOD A, X
+	
+	; make sure that the room is on the screen
+	; first: make sure that (player_x - left) > 0
+	; i.e., the left WALL is not off the map
+	
+	; TODO - test this THOROUGHLY to make sure I understand it properly
+	
+	SET Z, [player_x]
+	SUB Z, A
+	SUB Z, 1
+	IFG Z, [dungeon_width]
+		ADD A, Z
+	
+	set Z, [player_y]
+	SUB Z, B
+	SUB Z, 1
+	IFG Z, [dungeon_height]
+		ADD B, Z
+	
+	; TODO make sure we don't exceed the right or bottom bounds
+	
+	SET [room_left], [player_x]
+	SUB [room_left], A
+	SUB [room_left], 1
+	
+	SET [room_top], [player_y]
+	SUB [room_top], B
+	SUB [room_top], 1
+	
+	SET [room_right], [room_left]
+	ADD [room_right], X
+	ADD [room_right], 2
+	
+	SET [room_bottom], [room_top]
+	ADD [room_bottom], Y
+	ADD [room_bottom], 2
+	
+	JSR furnish_room
+	
+	JSR draw_map
+	
+	
 	SET PC, POP
 
 
+; clobbers I, A, B, C
+
+:furnish_room
+	
+	SET PC, POP
+
+; clobbers A, B, C, X, Y, Z
+; TODO should probably clean this up later
+:draw_map
+	; set up our drawing bounds
+	SET B, 0x8000
+	ADD B, [screen_width]
+	ADD B, 1
+	SET C, B
+	ADD C, [screen_width]
+	SUB C, 2
+	
+	; set up our level data bounds
+	SET Y, [room_top]
+	MUL Y, [dungeon_width]
+	MUL Y, 2
+	ADD Y, level_data
+	SET Z, Y
+	ADD Y, [room_left]
+	ADD Y, [room_left]
+	ADD Z, [room_right]
+	ADD Z, [room_right]
+	
+	; set up our drawing pointers
+	SET A, B
+	SET X, Y
+	
+	; set up an end condition
+	SET PUSH, [screen_height]
+	SUB PEEK, 1
+	MUL PEEK, [screen_width]
+	SUB PEEK, 1
+	ADD PEEK, 0x8000
+
+:draw_map_loop
+	IFG [X], 0x00FF
+		SET PC, draw_mob
+	IFG	[X], 0x0000
+		SET PC, draw_floor
+	; huh, if we got here, there's nothing on this tile!
+	SET [A], 0x0000
+:draw_map_incr
+	ADD A, 1
+	IFG A, C
+		SET PC, draw_map_nextline
+	ADD X, 1
+	SET PC, draw_map_loop
+
+:draw_map_nextline
+	ADD B, [screen_width]
+	ADD C, [screen_width]
+	
+	IFG C, PEEK
+		SET PC, exit_draw_map
+	
+	ADD Y, [dungeon_width]
+	ADD Y, [dungeon_width]
+	ADD Z, [dungeon_width]
+	ADD Z, [dungeon_width]
+	
+	SET A, B
+	SET X, Y
+	SET PC, draw_map_loop
+
+:draw_mob
+	SET PUSH, [X]
+	AND PEEK, 0xFF00
+	IFE PEEK, [player_offset]
+		SET PC, draw_player
+	SET [A], 0x0E00
+	ADD SP, 1
+	SET PC, draw_map_incr
+
+:draw_player
+	SET [A], [player_tile]
+	ADD SP, 1
+	SET PC, draw_map_incr
+
+:draw_floor
+	SET PUSH, [X]
+	ADD PEEK, floor_tile_data
+	SET [A], PEEK
+	ADD SP, 1
+	SET PC, draw_map_incr
+
+:exit_draw_map
+	ADD SP, 1 ; don't need that temporary variable any more
+	
+; DEBUG CODE follows
+	JSR debug_dump_player_coords
+	
+	SET A, room_left
+	SET B, 0x000C
+	SET C, 4
+	JSR print_mem_dump
+; END DEBUG CODE
+	
+	SET PC, POP
+	
+	
 
 ; leaves registers how it found them
 ; no inputs taken
@@ -339,6 +523,7 @@
 	SET B, 0
 	SET C, 2
 	JSR print_mem_dump
+	SET PC, POP
 
 ;;;;;;;;;;;;;;;;;;;;;;
 ; SECTION: CONSTANTS ;
@@ -359,9 +544,310 @@
 :cursor_char
 	DAT 0x0700
 
+:player_offset ; for purposes of placing the player on a tile
+	DAT 0xFF00
+
 ;;;;;;;;;;;;;;;;;;;;
 ; SECTION: CONTENT ;
 ;;;;;;;;;;;;;;;;;;;;
+
+:player_tile
+	DAT 0xF040
+
+
+; this floor tile data could probably be condensed, once we figure out
+; what the second nybble (0x00?0) is used for! After all, it IS a flag
+
+:floor_tile_data
+; comes in blocks of 16
+
+; 0x000? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x001? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x002? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x003? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x004? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x005? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x006? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x007? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x008? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x009? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x00A? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x00B? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x00C? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x00D? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x00E? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+; 0x00F? block
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
 
 ;;;;;;;;;;;;;;;;;
 ; SECTION: TEXT ;
@@ -417,10 +903,20 @@
 :player_y
 	DAT 0x0000
 
+:room_left
+	DAT 0x0000
+:room_top
+	DAT 0x0000
+:room_right
+	DAT 0x0000
+:room_bottom
+	DAT 0x0000
+
 ; dungeon tile stored as 2 words
 ; tile type stored on the lowest nybble of the first word
 ; the next nybble is reserved for temporary tile data
-; highest byte stores a mob ID (player at 0, and up to 255 mobs allowed)
+; highest byte stores a mob ID (player at 255, and up to 254 mobs allowed)
+; note that a null value is EMPTY
 ; item stored on second word
 
 
