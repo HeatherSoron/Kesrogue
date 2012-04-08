@@ -1,3 +1,5 @@
+
+
 ; key codes that might vary:
 ; left: 0x0001
 ; right: 0x0002
@@ -34,9 +36,148 @@
 	
 	JSR write_name
 	
+	SET [0x9000], 0
 	
-	
+:game_loop
+	SET A, [0x9000]
+	IFE A, 0
+		SET PC, game_loop
+	SET [0x9000], 0
+	IFE A, [key_up]
+		JSR walk_up
+	IFE A, [key_down]
+		JSR walk_down
+	IFE A, [key_left]
+		JSR walk_left
+	IFE A, [key_right]
+		JSR walk_right
+	SET PC, game_loop
+
+:hang	
 	SUB PC, 1
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; SECTION: GAME LOGIC FUNCTIONS ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+:walk_up
+	SET A, 0
+	SET B, 0xFFFF
+	JSR move_player
+	SET PC, POP
+:walk_down
+	SET A, 0
+	SET B, 1
+	JSR move_player
+	SET PC, POP
+:walk_right
+	SET A, 1
+	SET B, 0
+	JSR move_player
+	SET PC, POP
+:walk_left
+	SET A, 0xFFFF
+	SET B, 0
+	JSR move_player
+	SET PC, POP
+
+
+; inputs:
+; A: amount to move rightward
+; B: amount to move downward
+; uses unsigned arithmetic, so pass large values to get negatives
+
+; this function moves the player to the requested position (if valid)
+; if NOT valid, it silently ignores
+; if the target position contains a bumpable object, it bumps that object
+
+; clobbers A, B, C
+
+:move_player
+	SET PUSH, J
+	SET J, SP
+	
+	; first, get the target position
+	SET C, [player_y]
+	ADD C, B
+	MUL C, [dungeon_width]
+	ADD C, [player_x]
+	ADD C, A
+	SET PUSH, C
+	
+	; is the target position off the map?
+	SET C, [dungeon_width]
+	MUL C, [dungeon_height]
+	IFG PEEK, C
+		SET PC, exit_move_player
+	
+	; is there a mob at the target position?
+	SET C, PEEK
+	MUL C, 2
+	ADD C, level_data
+	SET C, [C]
+	IFG C, 0x00FF
+		SET PC, bump_mob
+	
+	; is the terrain passable?
+	AND C, 0x000F
+	ADD C, terrain_passability_def
+	IFG [C], 0
+		SET PC, player_move_successful
+	
+	; okay, then, is it bumpable?
+	SUB C, terrain_passability_def
+	ADD C, terrain_bumpability_def
+	IFG [C], 0
+		SET PC, bump_terrain
+	
+	; if we got here, then we should just silently exit
+	
+:exit_move_player
+	SET SP, J
+	SET J, POP
+	
+	JSR tick
+	
+	SET PC, POP
+
+:bump_mob
+	; TODO implement this
+	SET PC, exit_move_player
+
+:bump_terrain
+	; TODO implement this
+	SET PC, exit_move_player
+
+:player_move_successful
+	; [SP] should be the tile index that we're moving to
+	SET C, PEEK
+	MUL C, 2 ; two words per tile, remember?
+	ADD C, level_data
+	BOR [C], [player_offset]
+	
+	SET C, [player_y]
+	MUL C, [dungeon_width]
+	ADD C, [player_x]
+	MUL C, 2
+	ADD C, level_data
+	AND [C], 0x00FF
+	
+	ADD [player_x], A
+	ADD [player_y], B
+	
+	; TODO see if we need to make this more efficient than a full redraw
+	JSR draw_map
+	
+	SET PC, exit_move_player
+
+
+:tick
+	; TODO implement this
+	SET PC, POP
+	
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; SECTION: MAP FUNCTIONS ;
@@ -594,7 +735,15 @@
 	DAT 32
 :screen_height
 	DAT 16
-
+	
+:key_up
+	DAT 0x0003
+:key_down
+	DAT 0x0004
+:key_left
+	DAT 0x0001
+:key_right
+	DAT 0x0002
 :key_newline
 	DAT 0x000A ; ASCII line feed (Unix-style \n)
 
@@ -616,6 +765,52 @@
 :wall_tile
 	DAT 0x000F
 
+; floor tiles:
+; 0 = void
+; 1 = empty floor
+; F = wall
+
+:terrain_passability_def
+	DAT 0x0000
+	DAT 0x0001
+	DAT 0x0001
+	DAT 0x0001
+	
+	DAT 0x0001
+	DAT 0x0001
+	DAT 0x0001
+	DAT 0x0001
+	
+	DAT 0x0001
+	DAT 0x0001
+	DAT 0x0001
+	DAT 0x0001
+	
+	DAT 0x0001
+	DAT 0x0001
+	DAT 0x0001
+	DAT 0x0000
+
+:terrain_bumpability_def
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
+	DAT 0x0000
 
 ; this floor tile data could probably be condensed, once we figure out
 ; what the second nybble (0x00?0) is used for! After all, it IS a flag
