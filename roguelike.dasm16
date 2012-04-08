@@ -176,10 +176,18 @@
 	
 	JSR tick
 	
+	; TODO see if we need to make this more efficient than a full redraw
+	; if we do, it might need to be moved elsewhere
+	JSR draw_map
+	
 	SET PC, POP
 
 :bump_mob
-	; TODO implement this
+	SET A, PEEK
+	MUL A, 2
+	ADD A, level_data
+	; TODO *actually* implement this (needs HP and attack vals and such first)
+	JSR kill_mob
 	SET PC, exit_move_player
 
 :bump_terrain
@@ -202,9 +210,6 @@
 	
 	ADD [player_x], A
 	ADD [player_y], B
-	
-	; TODO see if we need to make this more efficient than a full redraw
-	JSR draw_map
 	
 	SET PC, exit_move_player
 
@@ -571,6 +576,28 @@
 	SET PC, POP
 	
 
+; inputs:
+; A: tile address that the mob lives on
+
+; clobbers B
+
+:kill_mob
+	SET B, [A]
+	SHR B, 8
+	AND [A], 0x00FF ; wipe the tile first
+	
+	
+	SUB B, 1
+	MUL B, 3
+	ADD B, mob_data ; get the address to work at
+	SET [B], 0
+	ADD B, 1
+	SET [B], 0
+	ADD B, 1	
+	SET [B], 0
+	
+	SET PC, POP
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; SECTION: PRNG FUNCTIONS ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -578,7 +605,7 @@
 ; output:
 ; A: pseudorandom number
 
-:rand	
+:rand
 	MUL [prng_state], 31421
 	MUL [prng_state], 6927
 	SET A, [prng_state]

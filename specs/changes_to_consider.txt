@@ -1,3 +1,5 @@
 Would it be better to store tile data with item in the low word? I guess we'll have to see which one ends up costing us fewer cycles, after more code is written.
 
 Should we go with tile states (16 possible states), or tile flags (4 flags)?
+
+Do we *need* to store mob positions? Or can we just assume that mobs only matter when they're within N tiles of the player, and hence only run calculations on those mobs?
