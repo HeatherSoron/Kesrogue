@@ -1,0 +1,6 @@
+* Get a proper map generation algorithm up and running
+* Implement items
+* Make mobs do stuff
+* HP tracking
+* combat calculations
+* etc.

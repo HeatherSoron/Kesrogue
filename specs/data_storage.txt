@@ -21,6 +21,16 @@ Longest player name: 16 chars (not counting the terminal null word)
 Max number of mobs per tile: 1
 Max number of items per tile: 1
 
+/=======\
+| ITEMS |
+\=======/
+
+Items will be stored in 1 word. For now, I think that the lower byte should be used for item ID, and the upper byte for the enchantment. However, I wonder whether it would be better to use 6 or 7 bits for the item ID (63 or 127 possible item types), in order to have more room for enchantments...
+
+The current plan is that items WILL NOT be stored more than once. Item's on the ground? Great! Don't need to store that elsewhere. In inventory? Great! It lives there, always. Equipped? Again, store it once.
+
+From a technical perspective, we COULD expand item storage, IF the map stores an index into an array. The map WILL NOT be used to store a 3rd word per tile; we're already using 16k RAM just for tile data, which is half of what's expected to be available to programs for free use!
+
 /==========\
 | MOB DATA |
 \==========/
