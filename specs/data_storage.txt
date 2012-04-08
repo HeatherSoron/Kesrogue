@@ -8,6 +8,8 @@ Map dimensions: 128x64
 
 Max number of mobs per level: 254 monsters, 1 player
 
+Max number of mob types: 255
+
 Max number of tile types: 16 (including null)
 
 Max tile states: 16
@@ -30,3 +32,5 @@ The tile word is divided into 3 sections. The lowest nybble is used for tile typ
 \===================/
 
 Most of the data occurs after the code (though not necessarily all; I think some small things like PRNG state might be intermixed with the code). Read-only content (mob definitions, etc.) occurs before variable content. We should probably offload some of that to floppy, when available. The massive tile data block (16k!) is at the end of the data block, and is followed by 0xDEADBEEFDEADBEEF.
+
+Mem_alloc has not been used; instead, things are just reserved with DAT declarations.
