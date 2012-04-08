@@ -1,0 +1,3 @@
+On the PRNG seeding screen, the current seed value is shown in the lower-left corner, in hex. Yes, it's a 16-bit seed for now; we'll enlarge that if necessary.
+
+On the gameplay screen, there is debug info along the top row. The two numbers on the left are the current player X, Y position; the four on the right are the room's left, top, right, and bottom coords, respectively. All of that is in hex.

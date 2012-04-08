@@ -1,5 +1,22 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; CURRENT VERSION: leaves registers the way it found them                     ;
+;                                  KESROGUE                                   ;
+;                                                                             ;
+;  The first roguelike for the DCPU, the computer in Notch's new game, 0x10c  ;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Originally written by Ethan Kaminski (aka Soron) in 2012
+; written in DCPU assembly, targeted at the DCPU
+
+; hereby released into the public domain (Unlicense/CC0 also acceptable)
+; I would like it if you properly credit all major contributors
+; but, at the same time, I don't want 0x10c to be constrained by IP laws
+
+; use DCPU-16 Studio to run this, at least until I/O specs are finalized
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; CURRENT VERSION: leaves registers the way it found them when you quit via Q ;
 ; This may be subject to change depending on how the specs/ecosystem work out ;
 ; (and also depending on how resource-hungry this ends up being, of course)   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1591,7 +1608,7 @@
 ; mobs are stored in 3 words
 ; first word: lower byte = mob type, upper byte = mob state (bitmask)
 ; second word: lower byte = HP, upper byte = MP (tentative)
-; third word: lower byte = X position, upper byte = Y position
+; third word: lower byte = Y position, upper byte = X position
 
 ; we only need room for 254 mobs
 

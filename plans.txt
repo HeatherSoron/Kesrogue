@@ -1,0 +1,1 @@
+Eventually, I plan on having multiple rooms per dungeon floor (obviously). Probably... 16, or so? We'll see. Each room will fit on the screen, with a 1 character border on all sides (for directional "DANGER LIES HERE" info, status info, etc.).
