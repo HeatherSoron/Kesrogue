@@ -1,5 +1,7 @@
 Not 100% complete.
 
+This *probably* supersedes comments in the code, when the two contradict each other.
+
 /==================\
 | HARD LIMITATIONS |
 \==================/
@@ -18,6 +20,16 @@ Longest player name: 16 chars (not counting the terminal null word)
 
 Max number of mobs per tile: 1
 Max number of items per tile: 1
+
+/==========\
+| MOB DATA |
+\==========/
+
+Mobs are stored in 3 words.
+
+First word: low byte used for mob species, high byte used for mob state (a bitmask)
+Second word: low byte used for HP, high byte used for MP (tentative)
+Third word: low byte used for Y position, high byte used for X position
 
 /============\
 | LEVEL DATA |
