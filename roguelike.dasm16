@@ -140,11 +140,71 @@
 	SET PC, POP
 
 
-; clobbers I, A, B, C
+; clobbers A, B, C
 
 :furnish_room
+	SET B, [room_top]
+	MUL B, [dungeon_width]
+	MUL B, 2
+	ADD B, level_data
+	SET C, B
 	
+	ADD B, [room_left]
+	ADD B, [room_left]
+	ADD C, [room_right]
+	ADD C, [room_right]
+	
+	; set up an end point
+	SET PUSH, [room_bottom]
+	MUL PEEK, [dungeon_width]
+	MUL PEEK, 2
+	ADD PEEK, level_data
+	ADD PEEK, [room_right]
+	
+	SET A, B
+	SET PC, build_horiz_wall_row
+	
+:furnish_room_loop
+	ADD B, [dungeon_width]
+	ADD B, [dungeon_width]
+	ADD C, [dungeon_width]
+	ADD C, [dungeon_width]
+	
+	SET A, B
+	
+	IFE C, PEEK
+		SET PC, build_horiz_wall_row
+	IFG C, PEEK
+		SET PC, exit_furnish_room
+	SET PC, build_next_room_row
+	
+:build_horiz_wall_row
+	SET [A], [wall_tile]
+	ADD A, 2
+	IFG A, C
+		SET PC, furnish_room_loop
+	SET PC, build_horiz_wall_row
+
+:build_next_room_row
+	IFE A, B
+		SET PC, add_vert_wall
+	IFE A, C
+		SET PC, add_vert_wall
+	AND [A], 0xFF00
+	BOR [A], [empty_floor_tile]
+	ADD A, 2
+	SET PC, build_next_room_row
+:add_vert_wall
+	SET [A], [wall_tile]
+	ADD A, 2
+	IFG A, C
+		SET PC, furnish_room_loop
+	SET PC, build_next_room_row
+
+:exit_furnish_room
+	ADD SP, 1
 	SET PC, POP
+	
 
 ; clobbers A, B, C, X, Y, Z
 ; TODO should probably clean this up later
@@ -162,11 +222,8 @@
 	MUL Y, [dungeon_width]
 	MUL Y, 2
 	ADD Y, level_data
-	SET Z, Y
 	ADD Y, [room_left]
 	ADD Y, [room_left]
-	ADD Z, [room_right]
-	ADD Z, [room_right]
 	
 	; set up our drawing pointers
 	SET A, B
@@ -190,7 +247,7 @@
 	ADD A, 1
 	IFG A, C
 		SET PC, draw_map_nextline
-	ADD X, 1
+	ADD X, 2
 	SET PC, draw_map_loop
 
 :draw_map_nextline
@@ -202,32 +259,27 @@
 	
 	ADD Y, [dungeon_width]
 	ADD Y, [dungeon_width]
-	ADD Z, [dungeon_width]
-	ADD Z, [dungeon_width]
 	
 	SET A, B
 	SET X, Y
 	SET PC, draw_map_loop
 
 :draw_mob
-	SET PUSH, [X]
-	AND PEEK, 0xFF00
-	IFE PEEK, [player_offset]
+	SET Z, [X]
+	AND Z, 0xFF00
+	IFE Z, [player_offset]
 		SET PC, draw_player
 	SET [A], 0x0E00
-	ADD SP, 1
 	SET PC, draw_map_incr
 
 :draw_player
 	SET [A], [player_tile]
-	ADD SP, 1
 	SET PC, draw_map_incr
 
 :draw_floor
-	SET PUSH, [X]
-	ADD PEEK, floor_tile_data
-	SET [A], PEEK
-	ADD SP, 1
+	SET Z, [X]
+	ADD Z, floor_tile_data
+	SET [A], [Z]
 	SET PC, draw_map_incr
 
 :exit_draw_map
@@ -554,6 +606,11 @@
 :player_tile
 	DAT 0xF040
 
+:empty_floor_tile
+	DAT 0x0001
+:wall_tile
+	DAT 0x000F
+
 
 ; this floor tile data could probably be condensed, once we figure out
 ; what the second nybble (0x00?0) is used for! After all, it IS a flag
@@ -563,6 +620,7 @@
 
 ; 0x000? block
 	DAT 0x0000
+	DAT 0xF02E ; floor
 	DAT 0x0000
 	DAT 0x0000
 	DAT 0x0000
@@ -576,8 +634,7 @@
 	DAT 0x0000
 	DAT 0x0000
 	DAT 0x0000
-	DAT 0x0000
-	DAT 0x0000
+	DAT 0x0700 ; wall (light gray)
 	
 ; 0x001? block
 	DAT 0x0000
