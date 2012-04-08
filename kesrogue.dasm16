@@ -5,6 +5,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Originally written by Ethan Kaminski (aka Soron) in 2012
+; no other contributors (yet) - but feel free to help out ;)!
 ; written in DCPU assembly, targeted at the DCPU
 
 ; hereby released into the public domain (Unlicense/CC0 also acceptable)
@@ -712,13 +713,22 @@
 	SET C, [0x9000]
 	IFE C, 0
 		SET PC, get_string_loop
+	SET [0x9000], 0
 	IFE C, [key_newline]
 		SET PC, exit_get_string
-	SET [0x9000], 0
+	IFE C, [key_backspace]
+		SET PC, get_string_backspace
 	SET PUSH, C
 	SET [A], PEEK
 	BOR [A], 0xF000
 	ADD A, 1
+	SET [A], [cursor_char]
+	SET PC, get_string_loop
+
+:get_string_backspace
+	SET POP, 0
+	SET [A], 0
+	SUB A, 1
 	SET [A], [cursor_char]
 	SET PC, get_string_loop
 
@@ -893,6 +903,8 @@
 	DAT 0x0002
 :key_newline
 	DAT 0x000A ; ASCII line feed (Unix-style \n)
+:key_backspace
+	DAT 0x0008 ; ASCII backspace char
 
 :cursor_char
 	DAT 0x0700
